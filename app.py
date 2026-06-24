@@ -536,13 +536,14 @@ elif page == "ML-Analyse":
             st.caption("Wetter beeinflusst Rad- und Fussnutzung. In Produktion via DWD-API.")
 
         with c2:
-            h24    = np.arange(24)
+            h24    = np.arange(24, dtype=float)
+            wd_arr = np.full(24, float(wd))
             X_pred = np.column_stack([
                 h24,
                 np.sin(2 * np.pi * h24 / 24),
                 np.cos(2 * np.pi * h24 / 24),
-                np.full(24, wd),
-                np.sin(2 * np.pi * wd / 7),
+                wd_arr,
+                np.sin(2 * np.pi * wd_arr / 7),
             ])
             y_pred = model_auslastung.predict(X_pred)
             y_pred = np.clip(y_pred * (0.85 + wetter * 0.03), 0, None).round()
