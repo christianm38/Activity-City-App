@@ -551,7 +551,7 @@ elif page == "ML-Analyse":
             noise  = y_pred * 0.12
 
             df_pred = pd.DataFrame({
-                "Uhrzeit":  [f"{h:02d}:00" for h in h24],
+                "Uhrzeit":  [f"{int(h):02d}:00" for h in h24],
                 "Prognose": y_pred,
                 "Oberes Band":  y_pred + noise,
                 "Unteres Band": np.maximum(0, y_pred - noise),
@@ -583,7 +583,7 @@ elif page == "ML-Analyse":
         c1, c2, c3 = st.columns(3)
         for col, idx in zip([c1, c2, c3], top3_idx):
             col.markdown(
-                mlcard(f"{idx:02d}:00 Uhr",
+                mlcard(f"{int(idx):02d}:00 Uhr",
                        f"{int(y_pred[idx]):,}".replace(",", "."),
                        "Nutzer erwartet"),
                 unsafe_allow_html=True,
