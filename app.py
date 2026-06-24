@@ -151,6 +151,25 @@ if "points" not in st.session_state:
     st.session_state.points = 1240
 if "mobility_log" not in st.session_state:
     st.session_state.mobility_log = generate_mobility_data()
+if "model_auslastung" not in st.session_state:
+    np.random.seed(0)
+    _n = 7 * 24
+    _h_all = np.arange(_n, dtype=float)
+    _wd    = (_h_all // 24) % 7
+    _hod   = _h_all % 24
+    _base  = np.array([50,120,380,820,1100,980,720,650,700,760,
+                        890,1050,870,680,720,980,1200,1080,760,430,
+                        280,160,80,50], dtype=float)
+    _y = np.array([
+        _base[int(h) % 24] * (1.2 if d >= 5 else 1.0) + np.random.normal(0, 60)
+        for h, d in zip(_hod, _wd)
+    ])
+    _X = np.column_stack([_hod, np.sin(2*np.pi*_hod/24), np.cos(2*np.pi*_hod/24),
+                           _wd,  np.sin(2*np.pi*_wd/7)])
+    _m = GradientBoostingRegressor(n_estimators=200, max_depth=4,
+                                    learning_rate=0.08, random_state=42)
+    _m.fit(_X, _y)
+    st.session_state.model_auslastung = _m
 
 engine = PointsEngine()
 
@@ -500,27 +519,8 @@ elif page == "ML-Analyse":
             unsafe_allow_html=True,
         )
 
-        # Modell trainieren auf synthetischen Stundendaten
-        np.random.seed(0)
-        n = 7 * 24  # eine Woche
-        hours_all = np.arange(n)
-        weekdays  = (hours_all // 24) % 7
-        hour_of_day = hours_all % 24
-        base_pattern = np.array([50,120,380,820,1100,980,720,650,700,760,
-                                  890,1050,870,680,720,980,1200,1080,760,430,
-                                  280,160,80,50])
-        y_train = np.array([base_pattern[h % 24] * (1.2 if d >= 5 else 1.0) +
-                            np.random.normal(0, 60) for h, d in zip(hour_of_day, weekdays)])
-        X_train = np.column_stack([
-            hour_of_day,
-            np.sin(2 * np.pi * hour_of_day / 24),
-            np.cos(2 * np.pi * hour_of_day / 24),
-            weekdays,
-            np.sin(2 * np.pi * weekdays / 7),
-        ])
-        model_auslastung = GradientBoostingRegressor(n_estimators=200, max_depth=4,
-                                                      learning_rate=0.08, random_state=42)
-        model_auslastung.fit(X_train, y_train)
+        # Modell aus Session State
+        model_auslastung = st.session_state.model_auslastung
 
         # Steuerung
         c1, c2 = st.columns([1, 2])
@@ -537,16 +537,17 @@ elif page == "ML-Analyse":
 
         with c2:
             h24    = np.arange(24, dtype=float)
-            wd_arr = np.full(24, float(wd))
-            X_pred = np.column_stack([
-                h24,
-                np.sin(2 * np.pi * h24 / 24),
-                np.cos(2 * np.pi * h24 / 24),
-                wd_arr,
-                np.sin(2 * np.pi * wd_arr / 7),
-            ])
+            wd_f   = float(wd)
+            wd_arr = np.full(24, wd_f, dtype=float)
+            X_pred = np.empty((24, 5), dtype=float)
+            X_pred[:, 0] = h24
+            X_pred[:, 1] = np.sin(2 * np.pi * h24 / 24)
+            X_pred[:, 2] = np.cos(2 * np.pi * h24 / 24)
+            X_pred[:, 3] = wd_arr
+            X_pred[:, 4] = np.sin(2 * np.pi * wd_arr / 7)
             y_pred = model_auslastung.predict(X_pred)
-            y_pred = np.clip(y_pred * (0.85 + wetter * 0.03), 0, None).round()
+            wetter_factor = 0.85 + float(wetter) * 0.03
+            y_pred = np.clip(y_pred * wetter_factor, 0, None).round()
             noise  = y_pred * 0.12
 
             df_pred = pd.DataFrame({
