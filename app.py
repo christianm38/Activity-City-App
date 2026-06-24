@@ -510,99 +510,99 @@ elif page == "ML-Analyse":
 
     tab1, tab2 = st.tabs(["Auslastungsprognose", "Mobilitatsanalyse"])
 
-    # ── Tab 1: Auslastungsprognose ──────────────────────────────────────────
+    # ── Tab 1: Auslastungskarte ────────────────────────────────────────────
     with tab1:
         st.markdown(
-            f"<p style='color:{TXT};'>Ein <b>Gradient-Boosting-Regressionsmodell</b> prognostiziert "
-            f"die Anzahl aktiver Nutzer im Stuttgarter Stadtgebiet fur die nachsten 24 Stunden. "
-            f"Features: Wochentag, Uhrzeit (sin/cos-kodiert), Wetter-Score, historischer Lag.</p>",
+            f"<p style='color:{TXT};'>Gradient-Boosting-Prognose der aktiven Nutzer "
+            f"je Stuttgarter Stadtbezirk — basierend auf Wochentag und Wetter.</p>",
             unsafe_allow_html=True,
         )
 
-        # Modell aus Session State
+        # Modell + Steuerung
         model_auslastung = st.session_state.model_auslastung
-
-        # Steuerung
-        c1, c2 = st.columns([1, 2])
-        with c1:
-            prog_tag = st.selectbox("Prognose-Tag", ["Heute (Montag)", "Morgen (Dienstag)",
-                                                      "Mittwoch", "Donnerstag", "Freitag",
-                                                      "Samstag", "Sonntag"])
-            wd_map = {"Heute (Montag)": 0, "Morgen (Dienstag)": 1, "Mittwoch": 2,
-                      "Donnerstag": 3, "Freitag": 4, "Samstag": 5, "Sonntag": 6}
-            wd = wd_map[prog_tag]
-
+        ctrl1, ctrl2 = st.columns([1, 1])
+        with ctrl1:
+            prog_tag = st.selectbox("Prognose-Tag", [
+                "Heute (Montag)", "Morgen (Dienstag)", "Mittwoch",
+                "Donnerstag", "Freitag", "Samstag", "Sonntag",
+            ])
+            wd = {"Heute (Montag)": 0, "Morgen (Dienstag)": 1, "Mittwoch": 2,
+                  "Donnerstag": 3, "Freitag": 4, "Samstag": 5, "Sonntag": 6}[prog_tag]
+        with ctrl2:
             wetter = st.slider("Wetter-Score (0 = Regen, 10 = Sonnig)", 0, 10, 7)
-            st.caption("Wetter beeinflusst Rad- und Fussnutzung. In Produktion via DWD-API.")
+            st.caption("In Produktion via DWD-API befullt.")
 
-        with c2:
-            h24    = np.arange(24, dtype=float)
-            wd_f   = float(wd)
-            wd_arr = np.full(24, wd_f, dtype=float)
-            X_pred = np.empty((24, 5), dtype=float)
-            X_pred[:, 0] = h24
-            X_pred[:, 1] = np.sin(2 * np.pi * h24 / 24)
-            X_pred[:, 2] = np.cos(2 * np.pi * h24 / 24)
-            X_pred[:, 3] = wd_arr
-            X_pred[:, 4] = np.sin(2 * np.pi * wd_arr / 7)
-            y_pred = model_auslastung.predict(X_pred)
-            wetter_factor = 0.85 + float(wetter) * 0.03
-            y_pred = np.clip(y_pred * wetter_factor, 0, None).round()
-            noise  = y_pred * 0.12
+        # ML-Prognose berechnen
+        h24    = np.arange(24, dtype=float)
+        wd_arr = np.full(24, float(wd), dtype=float)
+        X_pred = np.empty((24, 5), dtype=float)
+        X_pred[:, 0] = h24
+        X_pred[:, 1] = np.sin(2 * np.pi * h24 / 24)
+        X_pred[:, 2] = np.cos(2 * np.pi * h24 / 24)
+        X_pred[:, 3] = wd_arr
+        X_pred[:, 4] = np.sin(2 * np.pi * wd_arr / 7)
+        y_pred = model_auslastung.predict(X_pred)
+        y_pred = np.clip(y_pred * (0.85 + float(wetter) * 0.03), 0, None).round()
 
-            df_pred = pd.DataFrame({
-                "Uhrzeit":  [f"{int(h):02d}:00" for h in h24],
-                "Prognose": y_pred,
-                "Oberes Band":  y_pred + noise,
-                "Unteres Band": np.maximum(0, y_pred - noise),
-            })
+        # Aktuelle Stunde auf Bezirke verteilen
+        current_h  = min(datetime.now().hour, 23)
+        total_now  = int(y_pred[current_h])
+        weights    = BEZIRKE["nutzer"].values / BEZIRKE["nutzer"].sum()
+        rng        = np.random.default_rng(seed=current_h + wd * 24)
+        variation  = rng.uniform(0.85, 1.15, size=len(weights))
+        nutzer_now = np.maximum((weights * total_now * variation).round().astype(int), 5)
 
-            fig_prog = go.Figure()
-            fig_prog.add_trace(go.Scatter(
-                x=df_pred["Uhrzeit"], y=df_pred["Prognose"],
-                mode="lines", name="Prognose",
-                line=dict(color=R, width=2.5),
-                fill="tonexty",
-            ))
-            fig_prog.add_trace(go.Scatter(
-                x=list(df_pred["Uhrzeit"]) + list(df_pred["Uhrzeit"])[::-1],
-                y=list(df_pred["Oberes Band"]) + list(df_pred["Unteres Band"])[::-1],
-                fill="toself", fillcolor="rgba(232,49,42,0.12)",
-                line=dict(color="rgba(0,0,0,0)"), name="Konfidenzband",
-            ))
-            dk(fig_prog, 300)
-            fig_prog.update_layout(
-                xaxis_title="Uhrzeit",
-                yaxis_title="Aktive Nutzer (Prognose)",
+        bezirke_now = BEZIRKE.copy()
+        bezirke_now["aktiv_jetzt"] = nutzer_now
+
+        # Karte
+        st.markdown(
+            f"<p style='color:{MUT};font-size:.82rem;margin-top:.5rem;'>"
+            f"Aktuell ca. <b style='color:{TXT};'>{total_now:,}</b> Nutzer "
+            f"unterwegs in Stuttgart — {int(current_h):02d}:00 Uhr.</p>".replace(",", "."),
+            unsafe_allow_html=True,
+        )
+        map_col, stat_col = st.columns([3, 1])
+        with map_col:
+            fig_live = px.scatter_mapbox(
+                bezirke_now,
+                lat="lat", lon="lon",
+                size="aktiv_jetzt",
+                color="aktiv_jetzt",
+                color_continuous_scale=[
+                    [0.0, "#1a0a0a"], [0.3, "#6b0f0f"],
+                    [0.6, R], [0.85, RL], [1.0, AMB],
+                ],
+                hover_name="bezirk",
+                hover_data={"aktiv_jetzt": True, "oepnv_pct": True,
+                            "rad_pct": True, "lat": False, "lon": False},
+                size_max=55, zoom=11.0,
+                center={"lat": 48.775, "lon": 9.182},
+                mapbox_style="carto-darkmatter",
+                labels={"aktiv_jetzt": "Aktiv jetzt", "oepnv_pct": "OPNV %", "rad_pct": "Rad %"},
             )
-            st.plotly_chart(fig_prog, use_container_width=True)
-
-        # Spitzenstunden
-        st.markdown(sec("Prognostizierte Spitzenstunden"), unsafe_allow_html=True)
-        top3_idx = np.argsort(y_pred)[-3:][::-1]
-        c1, c2, c3 = st.columns(3)
-        for col, idx in zip([c1, c2, c3], top3_idx):
-            col.markdown(
-                mlcard(f"{int(idx):02d}:00 Uhr",
-                       f"{int(y_pred[idx]):,}".replace(",", "."),
-                       "Nutzer erwartet"),
-                unsafe_allow_html=True,
+            fig_live.update_layout(
+                paper_bgcolor=S1, margin=dict(t=0, b=0, l=0, r=0), height=500,
+                coloraxis_colorbar=dict(
+                    title=dict(text="Aktiv jetzt", font=dict(color=TXT, size=12)),
+                    tickfont=dict(color=TXT), bgcolor=S1, bordercolor=BRD,
+                ),
             )
+            st.plotly_chart(fig_live, use_container_width=True)
 
-        st.markdown(sec("Feature-Wichtigkeit (Modell-Erklarung)"), unsafe_allow_html=True)
-        feat_names = ["Uhrzeit", "Uhrzeit (sin)", "Uhrzeit (cos)", "Wochentag", "Wochentag (sin)"]
-        importances = model_auslastung.feature_importances_
-        df_fi = pd.DataFrame({"Feature": feat_names, "Wichtigkeit": importances}).sort_values("Wichtigkeit")
-        fig_fi = px.bar(df_fi, x="Wichtigkeit", y="Feature", orientation="h",
-                        color="Wichtigkeit",
-                        color_continuous_scale=[[0, "#7f0000"], [1, RL]],
-                        text="Wichtigkeit")
-        fig_fi.update_traces(texttemplate="%{text:.2f}", textposition="outside",
-                             textfont=dict(color=TXT))
-        fig_fi.update_coloraxes(showscale=False)
-        dk(fig_fi, 240)
-        st.plotly_chart(fig_fi, use_container_width=True)
-        st.caption("Gradient Boosting · 200 Estimatoren · Trainiert auf synthetischen Wochenstundendaten. In Produktion: echte GPS-Aggregatdaten (anonymisiert).")
+        with stat_col:
+            st.markdown(mlcard("Stadtgesamt",
+                f"{total_now:,}".replace(",", "."),
+                f"aktiv um {int(current_h):02d}:00 Uhr"), unsafe_allow_html=True)
+            st.markdown(mlcard("Aktivster Bezirk",
+                bezirke_now.loc[bezirke_now["aktiv_jetzt"].idxmax(), "bezirk"],
+                f"{bezirke_now['aktiv_jetzt'].max():,} Nutzer".replace(",", ".")),
+                unsafe_allow_html=True)
+            st.markdown(mlcard("Ruhigster Bezirk",
+                bezirke_now.loc[bezirke_now["aktiv_jetzt"].idxmin(), "bezirk"],
+                f"{bezirke_now['aktiv_jetzt'].min():,} Nutzer".replace(",", ".")),
+                unsafe_allow_html=True)
+            st.caption("Aktualisiert bei Anderung von Tag oder Wetter.")
 
     # ── Tab 2: Mobilitatsanalyse ──────────────────────────────────────────
     with tab2:
