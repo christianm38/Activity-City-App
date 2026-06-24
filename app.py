@@ -591,8 +591,7 @@ elif page == "Belohnungen":
         c1,c2,c3 = st.columns([.5, 3.5, 1.5])
         with c1:
             icon_lbl = r['icon']
-            ic = COLORS["text_muted"]; ibg = COLORS["border"]
-            st.markdown(f"<span style='font-size:0.82rem;font-weight:600;color:{ic};padding:3px 8px;background:{ibg};border-radius:6px;'>{icon_lbl}</span>", unsafe_allow_html=True)
+            st.markdown(f"<span style='font-size:0.82rem;font-weight:600;color:{MUT};padding:3px 8px;background:{BRD};border-radius:6px;'>{icon_lbl}</span>", unsafe_allow_html=True)
         with c2:
             st.markdown(
                 f"<div style='padding:4px 0;'>"
