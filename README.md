@@ -9,7 +9,7 @@ Nachhaltige Mobilitat und OPNV-Nutzung werden mit StuttPunkten belohnt — unter
 
 
 ---
-#Demo https://activity-city-app-3vtfw4psjrrhs22umc6ut5.streamlit.app
+Demo https://activity-city-app-3vtfw4psjrrhs22umc6ut5.streamlit.app
 
 ## Idee
 
