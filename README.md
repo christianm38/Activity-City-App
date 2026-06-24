@@ -7,7 +7,6 @@ Bewegung, nachhaltige Mobilität und ÖPNV-Nutzung werden mit StuttPunkten beloh
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.35+-red?logo=streamlit)](https://streamlit.io/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.4+-orange?logo=scikitlearn)](https://scikit-learn.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
 
