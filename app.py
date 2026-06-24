@@ -344,7 +344,7 @@ elif page == "Mobilitat & OPNV":
 
     c1,c2 = st.columns(2)
     with c1:
-        mode = st.selectbox("Verkehrsmittel", ["Zu Fuss","Fahrrad","Strassenbahn (VVS)",
+        mode = st.selectbox("Verkehrsmittel", ["Zu Fuß","Fahrrad","Strassenbahn (VVS)",
                             "Bus (VVS)","S-Bahn (VVS)","E-Scooter","Auto (keine Punkte)"])
         km   = st.slider("Strecke (km)", 0.5, 50.0, 5.0, step=0.5)
         dep  = st.time_input("Abfahrtszeit", value=datetime.now().replace(hour=8,minute=0,second=0,microsecond=0))
@@ -371,7 +371,7 @@ elif page == "Mobilitat & OPNV":
     with c2:
         st.markdown(sec("Punktetabelle"), unsafe_allow_html=True)
         df_mob = pd.DataFrame([
-            {"Verkehrsmittel":"Zu Fuss","Pkte/km":4,"CO₂/km":"0.21 kg"},
+            {"Verkehrsmittel":"Zu Fuß","Pkte/km":4,"CO₂/km":"0.21 kg"},
             {"Verkehrsmittel":"Fahrrad","Pkte/km":5,"CO₂/km":"0.21 kg"},
             {"Verkehrsmittel":"Strassenbahn Straßenbahn","Pkte/km":3,"CO₂/km":"0.17 kg"},
             {"Verkehrsmittel":"Bus Bus","Pkte/km":3,"CO₂/km":"0.12 kg"},
